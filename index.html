@@ -1,0 +1,437 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+    <link rel="stylesheet" href="https://a.amap.com/jsapi_demos/static/demo-center/css/demo-center.css" />
+    <title>18363037-赖凯煌-AMap</title>
+    <style>
+        html,
+        body,
+        #container {
+            width: 100%;
+            height: 100%;
+        }
+        .input-item{
+            height:2rem;
+        }
+        .btn{
+            width:6rem;
+            margin:0 0.5rem 0 0.5rem;
+        }
+        .input-text{
+            width:4rem;
+            margin-right:1rem;
+        }
+        #panel {
+            position: fixed;
+            background-color: white;
+            max-height: 80%;
+            overflow-y: auto;
+            top: 10px;
+            right: 10px;
+            width: 280px;
+            border-bottom: solid 1px silver;
+        }
+    </style>
+</head>
+<body>
+<div id="container"></div>
+<div id="panel"></div>
+<div class="info" style="width:10rem;left:100px;">
+    <div class="input-item">
+        <div class="input-item-prepend">
+            <span class="input-item-text" style="width:8rem;">请输入关键字</span>
+        </div>
+        <input id='tipinput' type="text">
+    </div>
+</div>
+
+<div class="input-card" style='width: 24rem;'>
+    <div class="input-item">
+        <input type="radio" name='func' checked="" value='SearchAround'><span class="input-text">周边搜索</span>
+        <input type="radio" name='func' value='SearchByLine'><span class="input-text">沿线搜索</span>
+        <input type="radio" name='func' value='SearchByPol'><span class="input-text" style='width:5rem;'>多边形搜索</span>
+    </div>
+    <div class="input-item">
+        <input type="radio" name='func' value='SearchByRec'><span class="input-text">矩形搜索</span>
+        <input type="radio" name='func' value='SearchByCircle'><span class="input-text">圆形搜索</span>
+    </div>
+    <div class="input-item">
+        <input id="clear" type="button" class="btn" value="清除标注" />
+        <input id="close" type="button" class="btn" value="重置搜索" />
+        <input id="save" type="button" class="btn" value="保存结果" />
+    </div>
+</div>
+
+<!-- 加载地图JSAPI脚本 -->
+<script src="https://webapi.amap.com/maps?v=1.4.15&key=6c25d7c46ed92b0e50f40789eabd155d&plugin=AMap.MouseTool,AMap.Autocomplete,AMap.PlaceSearch"></script>
+<!-- 加载JS-XLSX脚本 -->
+<script src='xlsx.full.min.js'></script>
+<script>
+    var POIArr=[['NAME','POIId','LNG','LAT']];   //创建空的数组，用于存储poi
+    var map = new AMap.Map('container', {
+        resizeEnable: true, //是否监控地图容器尺寸变化
+        zoom: 11, //初始化地图层级
+        center: [113.23333, 23.16667] //初始化地图中心点
+    });
+    AMap.plugin(['AMap.ToolBar', 'AMap.Scale'], function () {//异步加载多个插件：缩放工具条和比例尺
+        var toolbar = new AMap.ToolBar();
+        map.addControl(toolbar);
+        var scale = new AMap.Scale();
+        map.addControl(scale);
+    })
+    //输入提示
+    var autoOptions = {
+        input: "tipinput"
+    };
+    var auto = new AMap.Autocomplete(autoOptions);
+    //构造地点查询类
+    var placeSearch = new AMap.PlaceSearch({
+        map: map
+    });
+    //定义鼠标操作工具
+    var mouseTool = new AMap.MouseTool(map);
+    //定义绘图图层
+    var overlays = [];
+    //监听鼠标选择的绘图类型
+    mouseTool.on('draw', function (e) {
+        overlays.push(e.obj);
+        switch (e.obj.CLASS_NAME) {
+            case 'AMap.Marker': {
+                SearchAround(e); break;
+            }
+            case 'AMap.Polyline': {
+                SearchByLine(e); break;
+            }
+            case 'AMap.Polygon': {
+                SearchByPol(e); break;
+            }
+            case 'AMap.Rectangle': {
+                SearchByRec(e); break;
+            }
+            case 'AMap.Circle': {
+                SearchByCircle(e); break;
+            }
+        }
+    })
+    //操作数组,用于针对所选类型进行相应的draw操作
+    var radios = document.getElementsByName('func');
+    for (var i = 0; i < radios.length; i += 1) {
+        radios[i].onchange = function (e) {
+            draw(e.target.value)
+        }
+    }
+    //绘图函数:点、线、多边形、矩形、圆
+    function draw(type) {
+        switch (type) {
+            case 'SearchAround': {
+                mouseTool.marker({});//同Marker的Option设置
+                break;
+            }
+            case 'SearchByLine': {
+                mouseTool.polyline({
+                    strokeColor: '#80d8ff'});//同Polyline的Option设置
+                break;
+            }
+            case 'SearchByPol': {
+                mouseTool.polygon({
+                    fillColor: '#00b0ff',
+                    strokeColor: '#80d8ff'
+                }); //同Polygon的Option设置
+                break;
+            }
+            case 'SearchByRec': {
+                mouseTool.rectangle({
+                    fillColor: '#00b0ff',
+                    strokeColor: '#80d8ff'
+                }); //同Polygon的Option设置
+                break;
+            }
+            case 'SearchByCircle': {
+                mouseTool.circle({
+                    fillColor: '#00b0ff',
+                    strokeColor: '#80d8ff'
+                });//同Circle的Option设置
+                break;
+            }
+        }
+    }
+    //设置默认为周边搜索
+    draw('SearchAround');
+
+    //清除标记
+    document.getElementById('clear').onclick = function () {
+        mouseTool.close(true)//关闭,并清除覆盖物
+        var btContent = '';
+        var resLine = '';
+        map.clearMap();
+        document.getElementById("panel").innerHTML = '&nbsp';
+    }
+    //重置搜索
+    document.getElementById('close').onclick = function () {
+        mouseTool.close(true)//关闭,并清除覆盖物
+        for (var i = 0; i < radios.length; i += 1) {
+            radios[i].checked = false;
+        }
+    }
+    //保存结果
+    document.getElementById('save').onclick = function () {
+        let sheet = XLSX.utils.aoa_to_sheet(POIArr);
+        var blob = sheet2blob(sheet);
+        openDownloadDialog(sheet2blob(sheet),'POIData.xlsx');
+    }
+    // 将一个sheet转成最终的excel文件的blob对象，然后利用URL.createObjectURL下载
+    function sheet2blob(sheet, sheetName) {
+        sheetName = sheetName || 'sheet1';
+        var workbook = {
+            SheetNames: [sheetName],
+            Sheets: {}
+        };
+        workbook.Sheets[sheetName] = sheet;
+        // 生成excel的配置项
+        var wopts = {
+            bookType: 'xlsx', // 要生成的文件类型
+            bookSST: false, // 是否生成Shared String Table，官方解释是，如果开启生成速度会下降，但在低版本IOS设备上有更好的兼容性
+            type: 'binary'
+        };
+        var wbout = XLSX.write(workbook, wopts);
+        var blob = new Blob([s2ab(wbout)], {type:"application/octet-stream"});
+        // 字符串转ArrayBuffer
+        function s2ab(s) {
+            var buf = new ArrayBuffer(s.length);
+            var view = new Uint8Array(buf);
+            for (var i=0; i!=s.length; ++i) view[i] = s.charCodeAt(i) & 0xFF;
+            return buf;
+        }
+        return blob;
+    }
+    function openDownloadDialog(url, saveName)
+    {
+        if(typeof url == 'object' && url instanceof Blob)
+        {
+            url = URL.createObjectURL(url); // 创建blob地址
+        }
+        var aLink = document.createElement('a');
+        aLink.href = url;
+        aLink.download = saveName || ''; // HTML5新增的属性，指定保存文件名，可以不要后缀，注意，file:///模式下不会生效
+        var event;
+        if(window.MouseEvent) event = new MouseEvent('click');
+        else
+        {
+            event = document.createEvent('MouseEvents');
+            event.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+        }
+        aLink.dispatchEvent(event);
+    }
+    //周边搜索函数
+    function SearchAround(e) {
+        //构造地点查询类
+        var placeSearch = new AMap.PlaceSearch({
+            pageSize: 3, // 单页显示结果条数
+            pageIndex: 1, // 页码
+            city: "020", // 兴趣点城市
+            citylimit: true,  //是否强制限制在设置的城市内搜索
+            map: map, // 展现结果的地图实例
+            panel: "panel", // 结果列表将在此容器中进行展示。
+            autoFitView: true // 是否自动调整地图视野使绘制的 Marker点都处于视口的可见范围
+        });
+        var cpoint = e.obj.getPosition(); //中心点坐标
+        placeSearch.searchNearBy('', cpoint, 200, function (status, result) {
+            var pois = result.poiList.pois;
+            for (var i = 0; i < pois.length; i++) {
+                var poi = pois[i];
+                var marker = [];
+                marker[i] = new AMap.Marker({
+                    position: poi.location,   // 经纬度对象,也可以是经纬度构成的一维数组
+                    title: poi.name
+                });
+                // 将创建的点标记添加到已有的地图实例：
+                map.add(marker[i]);
+                //添加到数据库
+                addPOIData(poi.name, poi.id, poi.location.lng, poi.location.lat)
+            }
+            map.setFitView();
+        });
+    }
+    //沿线搜索
+    function SearchByLine(e) {
+        var placeSearch = new AMap.PlaceSearch({
+            pageSize: 3, // 单页显示结果条数
+            pageIndex: 1, // 页码
+            city: '020', //兴趣点城市
+            citylimit: true, //是 否强制限制在设置的城市内搜索
+            map: map, //展现结果的地图实例
+            panel: "panel", //结果列表将在panel中进行展示。
+            autoFitView: true//是否自动调整地图视野使绘制的Marker点都处于视口的可见范围
+        });
+        var polylineArr = e.obj.getPath();
+        var polylineArray = [];
+        for (i = 0; i < polylineArr.length; i++)
+            polylineArray[i] = [polylineArr[i].lng, polylineArr[i].lat];
+        var polyline = new AMap.Polygon({
+            path: polylineArray, //设置多边形边界路径
+            strokeColor: " #FF33FF",//线颜色
+            strokeOpacity: 0.2,//线透明度
+            strokeWeight: 5,  //线宽
+            fillColor: "#1791fc", //填充色
+            fill0pacity: 0.35//填充透明度
+        });
+        placeSearch.searchInBounds('', polyline, function (status, result) {
+            var pois = result.poiList.pois;
+            for (var i = 0; i < pois.length; i++) {
+                var poi = pois[i];
+                var marker = [];
+                marker[i] = new AMap.Marker({
+                    position: poi.location, //经纬度对象, 也可以是一维数组
+                    title: poi.name
+                });
+                //将创建的点标记添加到已有的地图实例:
+                map.add(marker[i]);
+                addPOIData(poi.name, poi.id, poi.location.lng, poi.location.lat);
+            }
+            map.setFitView();
+        });
+    }
+
+    //多边形搜索
+    function SearchByPol(e) {
+        var placeSearch = new AMap.PlaceSearch({
+            pageSize: 3, // 单页显示结果条数
+            pageIndex: 1, // 页码
+            city: '020', //兴趣点城市
+            citylimit: true, //是 否强制限制在设置的城市内搜索
+            map: map, //展现结果的地图实例
+            panel: "panel", //结果列表将在panel中进行展示。
+            autoFitView: true//是否自动调整地图视野使绘制的Marker点都处于视口的可见范围
+        });
+        var polygonArr = e.obj.getPath();
+        var polygonArray = [];
+        for (i = 0; i < polygonArr.length; i++)
+            polygonArray[i] = [polygonArr[i].lng, polygonArr[i].lat];
+        var polygon = new AMap.Polygon({
+            path: polygonArray, //设置多边形边界路径
+            strokeColor: " #FF33FF",//线颜色
+            strokeOpacity: 0.2,//线透明度
+            strokeWeight: 5,  //线宽
+            fillColor: "#1791fc", //填充色
+            fill0pacity: 0.35//填充透明度
+        });
+        placeSearch.searchInBounds('', polygon, function (status, result) {
+            var pois = result.poiList.pois;
+            for (var i = 0; i < pois.length; i++) {
+                var poi = pois[i];
+                var marker = [];
+                marker[i] = new AMap.Marker({
+                    position: poi.location, //经纬度对象, 也可以是一维数组
+                    title: poi.name
+                });
+                //将创建的点标记添加到已有的地图实例:
+                map.add(marker[i]);
+                addPOIData(poi.name, poi.i  , poi.location.lng, poi.location.lat);
+            }
+            map.setFitView();
+        });
+    }
+    //矩形搜索
+    function SearchByRec(e) {
+        console.log(e.obj.getBounds());
+        var placeSearch = new AMap.PlaceSearch({
+            pageSize: 3, // 单页显示结果条数
+            pageIndex: 1, // 页码
+            city: '020', //兴趣点城市
+            citylimit: true, //是 否强制限制在设置的城市内搜索
+            map: map, //展现结果的地图实例
+            panel: "panel", //结果列表将在panel中进行展示。
+            autoFitView: true//是否自动调整地图视野使绘制的Marker点都处于视口的可见范围
+        });
+        placeSearch.searchInBounds('', e.obj.getBounds(), function (status, result) {
+            var pois = result.poiList.pois;
+            for (var i = 0; i < pois.length; i++) {
+                var poi = pois[i];
+                var marker = [];
+                marker[i] = new AMap.Marker({
+                    position: poi.location, //经纬度对象, 也可以是一维数组
+                    title: poi.name
+                });
+                //将创建的点标记添加到已有的地图实例:
+                map.add(marker[i]);
+                addPOIData(poi.name, poi.id, poi.location.lng, poi.location.lat);
+            }
+            map.setFitView();
+        });
+    }
+
+    //圆形搜索
+    function SearchByCircle(e) {
+        var placeSearch = new AMap.PlaceSearch({
+            pageSize: 3, // 单页显示结果条数
+            pageIndex: 1, // 页码
+            city: '020', //兴趣点城市
+            citylimit: true, //是 否强制限制在设置的城市内搜索
+            map: map, //展现结果的地图实例
+            panel: "panel", //结果列表将在panel中进行展示。
+            autoFitView: true//是否自动调整地图视野使绘制的Marker点都处于视口的可见范围
+        });
+        var cpoint = e.obj.getCenter(); //中心点坐标
+        var r = e.obj.getRadius();//半径
+        placeSearch.searchNearBy('', cpoint,r, function (status, result) {
+            var pois = result.poiList.pois;
+            for (var i = 0; i < pois.length; i++) {
+                var poi = pois[i];
+                var marker = [];
+                marker[i] = new AMap.Marker({
+                    position: poi.location,   // 经纬度对象,也可以是经纬度构成的一维数组
+                    title: poi.name
+                });
+                // 将创建的点标记添加到已有的地图实例：
+                map.add(marker[i]);
+                //添加到数据库
+                addPOIData(poi.name, poi.id, poi.location.lng, poi.location.lat)
+            }
+            map.setFitView();
+        });
+    }
+    AMap.event.addListener(auto, "select", select);//注册监听,当选中某条记录时会触发
+    function select(e) {
+        placeSearch.setCity(e.poi.adcode);
+        placeSearch.search(e.poi.name, function (status, result) {
+            // 查询成功时,result即对应匹配的POI信息
+            console.log(result)
+            var pois = result.poiList.pois;
+            for (var i = 0; i < pois.length; i++) {
+                var poi = pois[i];
+                var marker = [];
+                marker[i] = new AMap.Marker({
+                    position: poi.location,   // 经纬度对象,也可以是经纬度构成的一维数组
+                    title: poi.name
+                });
+                // 将创建的点标记添加到已有的地图实例：
+                map.add(marker[i]);
+                //添加到数据库
+                addPOIData(poi.name, poi.id, poi.location.lng, poi.location.lat)
+            }
+            map.setFitView();
+        })
+    }
+    //添加数据到数组
+    function addPOIData(strName, strId, strLongitude, strLatitude) {
+        POIArr.push([strName,strId, strLongitude, strLatitude]);
+    }
+    //添加数据到数据库
+    function savePOIData(strName, strId, strLongitude, strLatitude) {
+        var conn = new ActiveXObject("ADODB.Connection");
+        conn.Open("DBQ=C:\\Users\\win\\source\\repos\\AMap\\AMapPOI.mdb;DRIVER={Microsoft Access Driver (*.mdb)};");
+        var sql = "insert into poi(Name,POIID,LNG,LAT) values('" + strName + "','" + strId + "','" + strLongitude + "','" + strLatitude + "')";
+        try {
+            conn.execute(sql);
+        }
+        catch (e) {
+            document.write(e.description);
+        }
+    }
+
+</script>
+</body>
+</html>
