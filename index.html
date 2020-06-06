@@ -252,7 +252,6 @@
                 //添加到数据库
                 addPOIData(poi.name, poi.id, poi.location.lng, poi.location.lat)
             }
-            map.setFitView();
         });
     }
     //沿线搜索
@@ -291,7 +290,6 @@
                 map.add(marker[i]);
                 addPOIData(poi.name, poi.id, poi.location.lng, poi.location.lat);
             }
-            map.setFitView();
         });
     }
 
@@ -331,7 +329,6 @@
                 map.add(marker[i]);
                 addPOIData(poi.name, poi.i  , poi.location.lng, poi.location.lat);
             }
-            map.setFitView();
         });
     }
     //矩形搜索
@@ -359,7 +356,6 @@
                 map.add(marker[i]);
                 addPOIData(poi.name, poi.id, poi.location.lng, poi.location.lat);
             }
-            map.setFitView();
         });
     }
 
@@ -390,7 +386,6 @@
                 //添加到数据库
                 addPOIData(poi.name, poi.id, poi.location.lng, poi.location.lat)
             }
-            map.setFitView();
         });
     }
     AMap.event.addListener(auto, "select", select);//注册监听,当选中某条记录时会触发
